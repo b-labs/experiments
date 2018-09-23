@@ -1,0 +1,29 @@
+from gpiozero import MotionSensor
+from picamera import PiCamera
+from signal import pause
+
+cam = PiCamera()
+pir1 = MotionSensor(23)
+pir2 = MotionSensor(24)
+n = 0
+
+def name():
+    return 'photo-%03d.jpg'%n
+
+def picture1():
+    global n
+    print('taking picture...')
+    cam.capture('/home/pi/Desktop/photos/%s'%name())
+    print('picture taken1')
+    n=n+1
+
+def picture2():
+    global n
+    print('taking picture...')
+    cam.capture('/home/pi/Desktop/photos/%s'%name())
+    print('picture taken2')
+    n=n+1
+
+pir1.when_motion = picture1
+#pir2.when_motion = picture2
+pause()

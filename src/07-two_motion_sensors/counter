@@ -1,0 +1,28 @@
+from gpiozero import MotionSensor
+import datetime, time
+
+
+MOTION_DETECTOR_RESOLUTION = 10
+PROBING_INTERVAL = 1
+
+pir1 = MotionSensor(23)
+pir2 = MotionSensor(24)
+false_positives = [0,0]
+
+while True:
+    m1 = pir1.motion_detected
+    m2 = pir2.motion_detected
+
+    if m1 and not m2:
+        false_positives[0] +=1
+    elif m2 and not m1:
+        false_positives[1] +=1
+
+    alert = m1 and m2
+    if True or alert:    
+        date = datetime.datetime.now()
+        timestamp = '%02d:%02d:%02d' % (date.hour,date.minute,date.second)
+        print '%s %s (%s)' % (timestamp, alert, ','.join(str(x) for x in false_positives))
+
+    time.sleep(MOTION_DETECTOR_RESOLUTION if alert else PROBING_INTERVAL)
+    
