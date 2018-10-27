@@ -10,7 +10,7 @@ def get_timestamp():
     return '%02d.%02d-%02d:%02d:%02d' % (date.month, date.day, date.hour, date.minute, date.second)
 
 PROBING_INTERVAL = 0.1
-PICTURE_INTERVAL = 0
+SLACK = 30
 
 cam = PiCamera(resolution=(800,600))
 pir1 = MotionSensor(23)
@@ -19,9 +19,10 @@ false_positives = [0,0]
 
 print('Big brother is watching you')
 
-current_alert = None
+alert = False
+last_alert_directory = None
+last_picture_time = None
 picture_counter = 0
-slack = 0
 
 while True:
     m1 = pir1.motion_detected
@@ -35,31 +36,24 @@ while True:
     if total_number_of_false_positives%100==0 and total_number_of_false_positives!=0:
         print('%s false alerts' % (','.join(str(x) for x in false_positives)))
 
+    now = datetime.datetime.now()
+    time_since_last_picture = (now-last_picture_time).total_seconds() if last_picture_time else None
+	
     all_sensors_agree_that_there_is_motion = m1 and m2
-    at_least_one_sensor_sees_motion_and_there_is_an_alert = current_alert is not None and (m1 or m2)
-    no_sensor_sees_motion_but_slack_is_active = (not m1 and not m2) and slack>0 
-    photo_must_be_taken = all_sensors_agree_that_there_is_motion or at_least_one_sensor_sees_motion_and_there_is_an_alert or no_sensor_sees_motion_but_slack_is_active
+    at_least_one_sensor_sees_motion_and_there_is_an_alert = alert and (m1 or m2)
+    alert = all_sensors_agree_that_there_is_motion or at_least_one_sensor_sees_motion_and_there_is_an_alert
 
-    if photo_must_be_taken:
-        if current_alert is None:
-            date = datetime.datetime.now()
+    if alert:
+        is_new_event = time_since_last_picture>SLACK if last_picture_time else True
+        if is_new_event:
             timestamp = get_timestamp()
             print('[%s] ALERT' % timestamp)
-            current_alert = '/home/pi/Desktop/photos/%s' % timestamp
-            os.mkdir(current_alert)
+            last_alert_directory = '/home/pi/Desktop/photos/%s' % timestamp
+            os.mkdir(last_alert_directory)
             picture_counter = 0
-        else:
-            if no_sensor_sees_motion_but_slack_is_active:
-                slack -= 1
-            else:
-                slack = 3
-        cam.capture('%s/%03d.jpg' % (current_alert,picture_counter))
-	print('*', picture_counter)
-	picture_counter += 1
+        cam.capture('%s/%03d-%d%d.jpg' % (last_alert_directory,picture_counter,+m1,+m2))
+        print('*', picture_counter)
+        picture_counter += 1
+        last_picture_time = now if picture_counter<999 else None
     else:
-        if current_alert is not None:
-            print('[%s] end (%d pictures)' % (get_timestamp(), picture_counter))
-            current_alert = None
-
-    time.sleep(PROBING_INTERVAL if current_alert is None else PICTURE_INTERVAL)
-    
+        time.sleep(PROBING_INTERVAL)
